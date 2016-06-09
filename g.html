@@ -1,0 +1,556 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Stick Invasion</title>
+		<link rel="stylesheet" type="text/css" href="style/style.css">
+		<link href='http://fonts.googleapis.com/css?family=Open+Sans:600' rel='stylesheet' type='text/css'>
+		<link href='http://fonts.googleapis.com/css?family=La+Belle+Aurore' rel='stylesheet' type='text/css'>
+		<link href='http://fonts.googleapis.com/css?family=Patrick+Hand+SC' rel='stylesheet' type='text/css'>
+		<link href='http://fonts.googleapis.com/css?family=Indie+Flower' rel='stylesheet' type='text/css'>
+	</head>
+	<body>
+		<div id="wrapper">
+			<header>
+				<a href="index.html"><h1>Stick Invasion Game<h1></a>
+			</header>
+			<article>
+				<canvas id="myCanvas" width="800" height="480"></canvas>
+
+			</article>
+			<script>
+				var width = 800,
+				height = 480,
+				canvas,
+				ctx,
+				keysDown = {},
+				enemyTotal = 5,
+				playerLives = 3,
+				monstersKilled = 0,
+				enemies = [],
+				powerups = [],
+				lookingLeft = true,
+				cooldown = false,
+				level = 1,
+				timePassed = 0,
+				powerupEnabled = false,
+				powerupDuration = 0,
+				powerupY = 0,
+				powerupX = 0,
+				powerupType,
+				powerupActiveDuration = 0,
+				powerupActive = false,
+				loopInterval,
+				runLeft = false,
+				runRight = false,
+				frameCount = 0,
+				frameCount2 = 0,
+				spriteX,
+				spriteY,
+				spriteX2 = 0,
+				idle = true,
+				gameStarted = false,
+				scores = [],
+				drawHighscore = false,
+				soundOff = false,
+				swordActive = false;
+
+				// Background image
+				var bgImage = new Image();
+				bgImage.src = "images/backgroundNew.png";
+				// Hero image
+				var heroImage = new Image();
+				heroImage.src = "images/heroNew.png";
+				var heroSprite = new Image();
+				heroSprite.src = "images/heroSprite.png";
+				var heroSpriteLeft = new Image();
+				heroSpriteLeft.src = "images/heroSpriteLeft.png";
+				var heroSpriteRight = new Image();
+				heroSpriteRight.src = "images/heroSpriteRight.png";
+				var heroSpriteSwordRight = new Image();
+				heroSpriteSwordRight.src = "images/heroSpriteSwordRight.png";
+				var heroSpriteSwordLeft = new Image();
+				heroSpriteSwordLeft.src = "images/heroSpriteSwordLeft.png";
+				
+				// Monster image
+				var monsterImage = new Image();
+				monsterImage.src = "images/enemyNew.png";
+				//Weapon images
+				var weaponLeft = new Image();
+				weaponLeft.src = "images/swordLeft.png";
+				var weaponRight = new Image();
+				weaponRight.src = "images/swordRight.png";
+				//Powerup image
+				var powerup0 = new Image();
+				powerup0.src = "images/powerup0.png";
+				var powerup1 = new Image();
+				powerup1.src = "images/powerup1.png";
+				var powerup2 = new Image();
+				powerup2.src = "images/powerup2.png";
+				var powerup3 = new Image();
+				powerup3.src = "images/powerup3.png";
+
+				var enemySprite = new Image();
+				enemySprite.src = "images/enemySprite.png";
+
+				var mainSound 			= new Audio("sound/Reptilia.mp3"); 
+				mainSound.volume=.1;
+				
+
+				var hero = {
+					speed: 18, x: width / 2, y: height / 2
+				};
+
+				var monster = {
+					speed: 0, y: 5, x: 0
+				}
+				
+				var weapon = {
+					health: 100
+				}
+				
+				var powerup = {
+					type: 0
+				}
+
+				function clearCanvas() {
+					ctx.clearRect(0,0,width,height);
+				}
+
+				function drawMenu() {
+					ctx.font = '50px Indie Flower';
+					ctx.textAlign = 'center';
+					ctx.fillText("Stick Invasion", canvas.width / 2, height / 2 -150);
+					ctx.drawImage(heroImage, canvas.width / 2, height / 2 - 100);
+					ctx.font = '25px Indie Flower';
+					ctx.fillText("Play", canvas.width / 2 + 60, height / 2 + 50);
+					ctx.fillText("High Score", canvas.width / 2 - 60, height / 2 + 50);
+					ctx.fillText("Arrow keys move the player and space bar attacks, look out for powerups!", canvas.width / 2, height / 2 + 100);
+					ctx.fillText("Press the \"m\" key to mute sound", canvas.width / 2, height / 2 + 130);
+				}
+
+				function drawEndMenu() {
+					mainSound.pause();
+					ctx.font = '50px Indie Flower';
+					ctx.textAlign = 'center';
+					ctx.fillText("Game Over", canvas.width / 2, canvas.height / 2 -150);
+					ctx.fillText("You Killed " + monstersKilled + " Monsters!", canvas.width / 2, canvas.height / 2 -50);
+					ctx.font = '25px Indie Flower';
+					ctx.fillText("Click to Restart", canvas.width / 2, height / 2 + 50);
+				}
+
+				function drawScores() {
+					drawMenu = false;
+					drawHighscore = true;
+					ctx.font = '50px Indie Flower';
+					ctx.textAlign = 'center';
+					ctx.fillText("High Scores", canvas.width / 2, canvas.height / 2 -150);
+					ctx.font = '25px Indie Flower';
+					var pos = 0;
+					for (var i = 0; i < 3; i++) {
+						var value = localStorage.getItem("score" + i);
+						ctx.fillText((i+1) + " " + value, canvas.width / 2, (height / 2 - 40) + pos);
+						pos += 40;
+					};
+					ctx.fillText("Play", canvas.width / 2, height / 2 + 70);
+				}
+
+				function gameStart() {
+    				gameStarted = true;
+    				playerLives = 3;
+    				addEnemies(enemyTotal);
+    				mainSound.play();
+ 					canvas.removeEventListener('click', mouseClick, false);
+				}
+				
+				function drawBackground() {
+					ctx.drawImage(bgImage, 0, 0);
+				}
+
+				function mouseClick() {
+					var x= event.clientX-document.documentElement.scrollLeft-canvas.offsetLeft;
+    				var y= event.clientY-document.documentElement.scrollTop-canvas.offsetTop;
+    				var playX0 = canvas.width / 2 + 39, playY0 = canvas.height / 2 + 35, playX1 = playX0 + 43, playY1 = playY0 + 30;
+    				var highX0 = canvas.width / 2 - 115, highY0 = canvas.height / 2 + 30, highX1 = highX0 + 100, highY1 = highY0 + 30;
+
+    					if (drawHighscore == true) {
+    						var playX0 = canvas.width / 2 -10, playY0 = canvas.height / 2 + 60, playX1 = playX0 + 43, playY1 = playY0 + 30;
+    						if (playX0<=x && x<playX1 && playY0<=y && y<playY1) {
+	            				gameStart();
+	        				}
+    					} else {
+	    					if (playX0<=x && x<playX1 && playY0<=y && y<playY1) {
+	            				gameStart();
+	        				}
+
+	        				if (highX0<=x && x<highX1 && highY0<=y && y<highY1) {
+	            				drawScores();
+	        				}
+	        			}
+        			}
+				
+				function drawHero() {
+					if (38 in keysDown && hero.y > 7) { // Player holding up and not out of bounds
+						hero.y -= hero.speed;
+						idle = false;
+					}
+					if (40 in keysDown && hero.y < 438) { // Player holding down and not out of bounds
+						hero.y += hero.speed;
+						idle = false;
+					}
+					if (37 in keysDown && hero.x > 5) { // Player holding left and not out of bounds
+						hero.x -= hero.speed;
+						lookingLeft = true;
+						idle = false;
+					}
+					if (39 in keysDown && hero.x < 760) { // Player holding right and not out of bounds
+						hero.x += hero.speed;
+						lookingLeft = false;
+						idle = false;
+					}
+
+					if (77 in keysDown) { // Player holding right and not out of bounds
+						if (soundOff == true) {
+							soundOff = false;
+							mainSound.play();
+						} else {
+							soundOff = true;
+							mainSound.pause();
+						}
+					}
+
+					if (32 in keysDown && weapon.health > 0) {
+						swordActive = true;
+						if (cooldown == false) {
+
+							if (lookingLeft == true) {
+								ctx.drawImage(heroSpriteSwordLeft, spriteX2, 0,  60, 50, hero.x, hero.y, 60, 50);
+							}
+							if (lookingLeft == false) {
+								ctx.drawImage(heroSpriteSwordRight, spriteX2, 0,  60, 50, hero.x, hero.y, 60, 50);
+							}
+
+							if (weapon.health > 0) {
+								weapon.health -= 2;
+							}
+						} else if (weapon.health < 100) {
+							weapon.health += 0.7;
+						}
+					} 
+
+
+					if (weapon.health < 100) {
+							weapon.health += 0.7;
+					}
+
+					if (swordActive != true || cooldown == true) {
+						if (idle == false) {
+							if (lookingLeft == true) {
+								ctx.drawImage(heroSpriteLeft, spriteX, 0,  30, 50, hero.x, hero.y, 30, 50);
+							} else if (lookingLeft == false) {
+								ctx.drawImage(heroSpriteRight, spriteX, 0,  30, 50, hero.x, hero.y, 30, 50);
+							} 
+						} else {
+							ctx.drawImage(heroSprite, spriteX, 0,  30, 50, hero.x, hero.y, 30, 50);
+						}
+					}
+					
+					if (frameCount == 3) {
+						frameCount = 0;
+						spriteX = 0;
+						spriteX2 = 0;
+					} else {
+						frameCount ++;
+						spriteX += 30;
+						spriteX2 += 60;
+					}
+					idle = true;
+					
+				}
+				
+				function drawEnemies() {
+					for (var i = 0; i < enemies.length; i++) {
+						ctx.drawImage(enemySprite, spriteX, 0,  30, 50, enemies[i][0], enemies[i][1], 30, 50);
+					}
+					if (timePassed == 50) {
+						monster.y = Math.floor((Math.random()*446)+1);
+						enemies.push([monster.x, monster.y, monster.speed]);
+					}
+				}
+				
+				function moveEnemies() {
+					for (var i = 0; i < enemies.length; i++) {
+						var newX = Math.floor((Math.random()*10)+1);
+						if (enemies[i][0] + newX > 795) {
+							playerLives--;
+							if (enemies[i][2] == 10) {
+								enemies.splice(i, 1);
+							}
+							enemies[i][0] = -15;
+							enemies[i][1] = Math.floor((Math.random()*446)+1);
+						} else {
+							enemies[i][0] += (newX + enemies[i][2]);
+						}
+					}
+				}
+				
+				function checkCollision() {
+					var randomSound = Math.floor(Math.random()*5)+1;
+					var enemyDeathSound 	= new Audio("sound/DeathNoise"+ randomSound +".wav"); 
+					if (swordActive == true && cooldown == false) {
+						for (var i = 0; i < enemies.length; i++) {
+							if (
+								lookingLeft == true
+								&& hero.x + 10 <= (enemies[i][0] + 30) 		
+								&& enemies[i][0] <= (hero.x + 20)
+								&& hero.y + 20 <= (enemies[i][1] + 50)
+								&& enemies[i][1] <= (hero.y + 50)
+								&& swordActive == true
+								) {
+									enemies[i][0] = -15;
+									enemies[i][1] = Math.floor((Math.random()*446)+1);
+									monstersKilled++;
+									enemyTotal++;
+									enemyDeathSound.play();
+								}
+
+							if (
+								lookingLeft == false
+								&& enemies[i][0] - 20 <= hero.x + 30
+								&& hero.x + 40 <= enemies[i][0] + 20
+								&& enemies[i][1] + 20 <= hero.y + 50
+								&& hero.y <= enemies[i][1] + 50
+								&& swordActive == true
+							) {
+								enemies[i][0] = -15;
+								enemies[i][1] = Math.floor((Math.random()*446)+1);
+								monstersKilled++;
+								enemyTotal++;
+								enemyDeathSound.play();
+							}
+
+						}
+					}
+					if (powerupEnabled == true) {
+						if (
+							hero.x <= (powerups[0][0] + 30) 		
+							&& powerups[0][0] <= (hero.x + 30)
+							&& hero.y <= (powerups[0][1] + 40)
+							&& powerups[0][1] <= (hero.y + 40)
+						) {
+							powerupActive = true;
+							powerupEnabled = false;
+							powerupDuration = 0;
+							powerups.splice(0, 1);
+						}
+					}
+					if (powerupActive == true) {
+						powerupActiveDuration++;
+						if (powerupType == 0) {
+							weapon.health = 100;	 
+							displayMessage("Unlimited Weapon Health!");
+						} else if (powerupType == 1) {
+							displayMessage("Three Added Lives!");
+							playerLives += 3;
+							powerupType = 4;
+						} else if (powerupType == 2) {
+							for (var i = 0; i < enemies.length; i++) {
+								enemies[i][2] = -3;
+							}
+							displayMessage("Enemies Slowed!");
+						} else if (powerupType == 3) {
+							hero.speed = 30;
+							displayMessage("Hero Speed Increased!");
+						}
+
+						if (powerupActiveDuration == 100) {
+							powerupActive = false;
+							powerupActiveDuration = 0;
+							resetSpeed(); 
+						}
+					}
+				swordActive = false;
+				}
+				
+				function addEnemies(amount) {
+					for (var i = 0; i < amount; i++) {
+						monster.y = Math.floor((Math.random()*446)+1);
+						enemies.push([monster.x, monster.y, monster.speed]);
+					}
+				}
+
+				function addPowerup() {
+					if (powerupActive == false) {
+						if (powerupEnabled == false) {
+							powerup.x = Math.floor((Math.random()*446)+1);
+							powerup.y = Math.floor((Math.random()*446)+1);
+							powerup.type = Math.floor(Math.random()*4);
+							powerups.push([powerup.x, powerup.y, powerup.type])
+							powerupType = powerups[0][2];
+						}
+
+						powerupEnabled = true;
+						ctx.fillText("Type: " + powerupType,10,90);
+
+						if (powerupType == 0) {
+							ctx.drawImage(powerup0, powerups[0][0], powerups[0][1]);
+						} else if (powerupType == 1) {
+							ctx.drawImage(powerup1, powerups[0][0], powerups[0][1]);
+						} else if (powerupType == 2) {
+							ctx.drawImage(powerup2, powerups[0][0], powerups[0][1]);
+						} else if (powerupType == 3) {
+							ctx.drawImage(powerup3, powerups[0][0], powerups[0][1]);
+						}
+
+						
+						powerupDuration++;
+
+						if (powerupDuration == 50) {
+							powerupEnabled = false;
+							powerupDuration = 0;
+							powerupType = 4;
+							powerups.splice(0, 1);
+						}
+					}
+					//Unlimited Sword Health - 0
+					//Recieve Three Lives - 1
+					//Hero Speed Doubled - 2
+					//Enemy Speed Havled - 3
+				}
+
+				function displayMessage(message) {
+					ctx.textAlign = 'center';
+					x = canvas.width / 2;
+					ctx.fillText(message,x,canvas.height - 30);
+				}
+
+				function resetSpeed(){
+					for (var i = 0; i < enemies.length; i++) {
+						enemies[i][2] = 0;
+					}	
+					hero.speed = 18;
+				}
+
+				function restart() {
+					monstersKilled = 0;
+					timePassed = 0;
+					weapon.health = 100;
+					gameStarted = false;
+					enemyTotal = 5;
+					enemies = [];
+					powerupEnabled = false;
+					powerupActive = false;
+					powerupDuration = 0;
+					canvas.addEventListener('click', mouseClick, false);
+				}
+
+				function init() {
+					newGame = true;
+					canvas = document.getElementById("myCanvas");
+					ctx = canvas.getContext("2d");
+					loopInterval = setInterval(gameLoop, 50);
+
+					addEventListener("keydown", function (e) {
+						keysDown[e.keyCode] = true;
+					}, false);
+					addEventListener("keyup", function (e) {
+						delete keysDown[e.keyCode];
+					}, false);
+
+					canvas.addEventListener('click', mouseClick, false);
+
+				}
+				
+				function gameLoop() {
+					if (gameStarted == false) {
+						clearCanvas();
+						if (drawHighscore == true) {
+							drawBackground();
+							drawScores()
+						} else {
+							drawBackground();
+							drawMenu();
+						}
+					}
+					if (gameStarted == true && playerLives > 0) {
+						timePassed++;
+						clearCanvas();
+						drawBackground();
+						drawEnemies(); 
+						moveEnemies();
+						drawHero();
+						var powerupChance = Math.random();
+						if (powerupChance < 0.01 || powerupEnabled == true) {
+							addPowerup();
+						}
+						checkCollision();
+						if (weapon.health < 1) {
+							cooldown = true;
+						} else if (weapon.health >= 30) {
+							cooldown = false;
+						}
+
+						if (timePassed == 500) {
+							//level 2
+							level++;
+							enemyTotal ++;
+							addEnemies(1);
+						};
+
+						if (timePassed == 1100) {
+							//level 3
+							level++;
+							enemyTotal ++;
+							addEnemies(1);
+						};
+
+						if (timePassed == 2420) {
+							//level 4
+							level++;
+							enemyTotal += 3;
+							addEnemies(3);
+						};
+
+						if (timePassed == 5000) {
+							//level 5
+							level++;
+							enemyTotal += 3;
+							addEnemies(5);
+						};
+
+						if (playerLives <= 0) {
+							if (newGame == true) {
+								for (var i = 0; i < 3; i++) {
+									var value = localStorage.getItem("score" + i);
+									scores.push([value]);
+								};
+							}
+							scores.push([monstersKilled]);
+							scores.sort(function(a,b){return a-b});
+							var length = scores.length - 1;
+
+							for (var i = 0; i < 3; i++) {
+								localStorage.setItem("score" + i , scores[length]);
+								length--;
+							};
+							drawBackground();
+							drawEndMenu();
+							canvas.addEventListener('click', restart, false);
+							newGame = false;
+						}
+
+						ctx.textAlign = 'start';
+						ctx.font = '20px Patrick Hand SC';
+						ctx.fillText("Monsters Killed: " + monstersKilled,10,30);
+						ctx.fillText("Player Lives: " + playerLives,10,50);
+						ctx.fillText("Sword Life: " + weapon.health.toFixed(0),10,70);			
+						if (cooldown == true) {
+							ctx.fillText("Cooldown Active! " ,635,30);
+						}
+					}
+				}
+				
+				window.onload = init;	
+			</script>
+		</div>
+	</body>
+<html>
